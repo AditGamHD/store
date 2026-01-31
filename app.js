@@ -1,16 +1,20 @@
 // App state
 let appState = {
-    store: null,
+    web: null,
+    sellers: [],
     products: [],
     filteredProducts: [],
+    categories: [],
     currentLanguage: 'id',
     currentView: 'home',
     currentProductId: null,
-    currentSellerUsername: null,
+    currentSellerId: null,
     currentCategory: 'all',
     searchQuery: '',
     isLoading: true,
-    isError: false
+    isError: false,
+    bannerInterval: null,
+    currentBannerIndex: 0
 };
 
 // DOM Elements
@@ -41,40 +45,47 @@ function initializeDOM() {
     };
 }
 
-// Load data from data.json
+// Load data from web.json and seller.json
 async function loadAppData() {
     try {
         appState.isLoading = true;
         
-        const response = await fetch('data.json');
-        if (!response.ok) {
-            throw new Error(`HTTP error! status: ${response.status}`);
+        // Load web.json
+        const webResponse = await fetch('web.json');
+        if (!webResponse.ok) {
+            throw new Error(`HTTP error! status: ${webResponse.status}`);
         }
+        const webData = await webResponse.json();
+        appState.web = webData;
         
-        const data = await response.json();
+        // Load seller.json
+        const sellerResponse = await fetch('seller.json');
+        if (!sellerResponse.ok) {
+            throw new Error(`HTTP error! status: ${sellerResponse.status}`);
+        }
+        const sellerData = await sellerResponse.json();
+        appState.sellers = sellerData;
         
-        // Store the data in app state
-        appState.store = data.store;
-        appState.products = data.products;
-        appState.filteredProducts = data.products;
+        // Process sellers and products
+        processSellersData();
         
         // Set initial language
-        appState.currentLanguage = data.store.default_language || 'id';
+        appState.currentLanguage = appState.web.default_language || 'id';
         if (domElements.languageSelect) {
             domElements.languageSelect.value = appState.currentLanguage;
         }
         
         // Update store name in UI
         if (domElements.logoText) {
-            domElements.logoText.textContent = appState.store.name;
+            domElements.logoText.textContent = appState.web.store_name;
         }
         if (domElements.footerStoreName) {
-            domElements.footerStoreName.textContent = appState.store.name;
+            domElements.footerStoreName.textContent = appState.web.store_name;
         }
         
         // Update copyright if provided
-        if (appState.store.copyright && domElements.copyright) {
-            domElements.copyright.textContent = appState.store.copyright;
+        if (appState.web.copyright && domElements.copyright) {
+            domElements.copyright.textContent = appState.web.copyright;
         }
         
         appState.isLoading = false;
@@ -92,6 +103,40 @@ async function loadAppData() {
         appState.isError = true;
         renderErrorState();
     }
+}
+
+// Process sellers data to create products array and categories
+function processSellersData() {
+    appState.products = [];
+    appState.categories = new Set();
+    
+    appState.sellers.forEach(seller => {
+        if (seller.products && seller.products.length > 0) {
+            seller.products.forEach(product => {
+                // Add seller info to product
+                const productWithSeller = {
+                    ...product,
+                    seller_id: seller.id,
+                    seller_username: seller.username,
+                    seller_logo: seller.logo_url,
+                    seller_verified: seller.verified,
+                    seller_note: seller.note,
+                    seller_wa_number: seller.wa_number || appState.web.wa_number,
+                    seller_social_media: seller.social_media || []
+                };
+                
+                appState.products.push(productWithSeller);
+                
+                // Add category to categories set
+                if (product.category) {
+                    appState.categories.add(product.category);
+                }
+            });
+        }
+    });
+    
+    appState.filteredProducts = [...appState.products];
+    appState.categories = Array.from(appState.categories).sort();
 }
 
 // Setup event listeners
@@ -163,30 +208,30 @@ function handleHashChange() {
     if (hash === '#/' || hash === '') {
         appState.currentView = 'home';
         appState.currentProductId = null;
-        appState.currentSellerUsername = null;
+        appState.currentSellerId = null;
         hideWhatsAppCTA();
     } else if (hash.startsWith('#/product/')) {
         appState.currentView = 'product-detail';
         const id = hash.replace('#/product/', '');
         appState.currentProductId = id;
-        appState.currentSellerUsername = null;
+        appState.currentSellerId = null;
         showWhatsAppCTA();
     } else if (hash.startsWith('#/seller/')) {
         appState.currentView = 'seller-profile';
-        const username = hash.replace('#/seller/', '');
-        appState.currentSellerUsername = username;
+        const id = hash.replace('#/seller/', '');
+        appState.currentSellerId = id;
         appState.currentProductId = null;
         hideWhatsAppCTA();
     } else if (hash.startsWith('#/about')) {
         appState.currentView = 'about';
         appState.currentProductId = null;
-        appState.currentSellerUsername = null;
+        appState.currentSellerId = null;
         hideWhatsAppCTA();
     } else {
         // Default to home
         appState.currentView = 'home';
         appState.currentProductId = null;
-        appState.currentSellerUsername = null;
+        appState.currentSellerId = null;
         hideWhatsAppCTA();
     }
     
@@ -221,10 +266,12 @@ function filterProducts() {
             const title = getLocalizedText(product.title, appState.currentLanguage).toLowerCase();
             const description = getLocalizedText(product.description, appState.currentLanguage).toLowerCase();
             const tags = product.tags ? product.tags.join(' ').toLowerCase() : '';
+            const seller = product.seller_username ? product.seller_username.toLowerCase() : '';
             
             return title.includes(appState.searchQuery) || 
                    description.includes(appState.searchQuery) || 
-                   tags.includes(appState.searchQuery);
+                   tags.includes(appState.searchQuery) ||
+                   seller.includes(appState.searchQuery);
         });
     }
     
@@ -285,29 +332,111 @@ function renderCurrentView() {
     }
 }
 
-// Render home view with products grid
+// Render home view with banner, running text, categories, and products grid
 function renderHomeView() {
     const container = domElements.pageContent;
     if (!container) return;
     
-    let html = `
-        <div class="page-title" data-i18n="home.title">Produk Terbaru</div>
-        <div class="filters-container">
-            <button class="filter-btn ${appState.currentCategory === 'all' ? 'active' : ''}" 
-                    data-category="all" data-i18n="filter.all">Semua</button>
-    `;
+    // Clear any existing banner interval
+    if (appState.bannerInterval) {
+        clearInterval(appState.bannerInterval);
+        appState.bannerInterval = null;
+    }
     
-    // Get unique categories
-    const categories = [...new Set(appState.products.map(p => p.category).filter(Boolean))];
-    categories.forEach(category => {
-        const isActive = appState.currentCategory === category.toLowerCase();
+    let html = '';
+    
+    // Add banner if available
+    if (appState.web.banners && appState.web.banners.length > 0) {
         html += `
-            <button class="filter-btn ${isActive ? 'active' : ''}" 
-                    data-category="${category.toLowerCase()}">${escapeHtml(category)}</button>
+            <div class="banner-container">
+                <div class="banner-slider" id="banner-slider">
         `;
-    });
+        
+        appState.web.banners.forEach((banner, index) => {
+            html += `
+                <div class="banner-slide ${index === 0 ? 'active' : ''}" data-index="${index}">
+                    <img src="${escapeHtml(banner)}" 
+                         alt="Banner ${index + 1}" 
+                         class="banner-image"
+                         loading="lazy"
+                         onerror="this.onerror=null; this.src='data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMTYwMCIgaGVpZ2h0PSI5MDAiIHZpZXdCb3g9IjAgMCAxNiA5IiBmaWxsPSJub25lIiB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciPjxyZWN0IHdpZHRoPSIxNiIgaGVpZ2h0PSI5IiBmaWxsPSIjRjFGNUY5Ii8+PHBhdGggZD0iTTMgNUMzLjgyODQzIDUgNC41IDUuNjcxNTcgNC41IDYuNUM0LjUgNy4zMjg0MyAzLjgyODQzIDggMyA4QzIuMTcxNTcgOCAxLjUgNy4zMjg0MyAxLjUgNi41QzEuNSA1LjY3MTU3IDIuMTcxNTcgNSAzIDVaIiBmaWxsPSIjQ0NEQUUwIiBmaWxsLW9wYWNpdHk9IjAuNSIvPjwvc3ZnPg==';">
+                </div>
+            `;
+        });
+        
+        html += `
+                </div>
+                <div class="banner-nav">
+                    <button class="banner-prev" id="banner-prev">
+                        <i class="fas fa-chevron-left"></i>
+                    </button>
+                    <button class="banner-next" id="banner-next">
+                        <i class="fas fa-chevron-right"></i>
+                    </button>
+                </div>
+                <div class="banner-dots" id="banner-dots">
+        `;
+        
+        appState.web.banners.forEach((_, index) => {
+            html += `
+                <button class="banner-dot ${index === 0 ? 'active' : ''}" data-index="${index}"></button>
+            `;
+        });
+        
+        html += `
+                </div>
+            </div>
+        `;
+    }
     
-    html += `</div>`;
+    // Add running text if available
+    if (appState.web.running_text) {
+        const runningText = getLocalizedText(appState.web.running_text, appState.currentLanguage);
+        html += `
+            <div class="running-text-container">
+                <div class="running-text">${escapeHtml(runningText)}</div>
+            </div>
+        `;
+    }
+    
+    // Add categories section
+    if (appState.categories.length > 0) {
+        html += `
+            <div class="categories-container">
+                <h2 class="categories-title" data-i18n="home.categories">Kategori Produk</h2>
+                <div class="categories-grid" id="categories-grid">
+                    <div class="category-card ${appState.currentCategory === 'all' ? 'active' : ''}" data-category="all">
+                        <div class="category-icon">
+                            <i class="fas fa-boxes"></i>
+                        </div>
+                        <div class="category-name" data-i18n="filter.all">Semua</div>
+                    </div>
+        `;
+        
+        appState.categories.forEach(category => {
+            const isActive = appState.currentCategory === category.toLowerCase();
+            html += `
+                <div class="category-card ${isActive ? 'active' : ''}" data-category="${category.toLowerCase()}">
+                    <div class="category-icon">
+                        <i class="fas fa-tag"></i>
+                    </div>
+                    <div class="category-name">${escapeHtml(category)}</div>
+                </div>
+            `;
+        });
+        
+        html += `
+                </div>
+            </div>
+        `;
+    }
+    
+    // Add products section
+    html += `
+        <div class="products-title-container">
+            <h2 class="page-title" data-i18n="home.products">Produk Terbaru</h2>
+        </div>
+    `;
     
     if (appState.filteredProducts.length === 0) {
         html += `
@@ -320,39 +449,112 @@ function renderHomeView() {
             </div>
         `;
     } else {
-        html += `<div class="products-grid" id="products-grid">`;
-        
-        // Use requestAnimationFrame for smooth rendering
-        requestAnimationFrame(() => {
-            appState.filteredProducts.forEach((product, index) => {
-                // Stagger animations
-                setTimeout(() => {
-                    renderProductCard(product, index);
-                }, index * 50);
-            });
-        });
-        
-        html += `</div>`;
+        html += `<div class="products-grid" id="products-grid"></div>`;
     }
     
     container.innerHTML = html;
     
-    // Add event listeners to filter buttons
-    const filterButtons = container.querySelectorAll('.filter-btn');
-    filterButtons.forEach(btn => {
-        btn.addEventListener('click', function() {
+    // Add event listeners to category cards
+    const categoryCards = container.querySelectorAll('.category-card');
+    categoryCards.forEach(card => {
+        card.addEventListener('click', function() {
             setCategoryFilter(this.dataset.category);
         });
     });
+    
+    // Setup banner functionality
+    if (appState.web.banners && appState.web.banners.length > 0) {
+        setupBanner();
+    }
     
     // Render product cards
     if (appState.filteredProducts.length > 0) {
         const productsGrid = container.querySelector('#products-grid');
         if (productsGrid) {
             appState.filteredProducts.forEach((product, index) => {
-                productsGrid.appendChild(createProductCardElement(product, index));
+                // Stagger animations
+                setTimeout(() => {
+                    productsGrid.appendChild(createProductCardElement(product, index));
+                }, index * 50);
             });
         }
+    }
+}
+
+// Setup banner functionality
+function setupBanner() {
+    const bannerSlides = document.querySelectorAll('.banner-slide');
+    const bannerDots = document.querySelectorAll('.banner-dot');
+    const prevButton = document.getElementById('banner-prev');
+    const nextButton = document.getElementById('banner-next');
+    
+    if (!bannerSlides.length || !prevButton || !nextButton) return;
+    
+    // Function to change banner slide
+    const changeBannerSlide = (index) => {
+        // Update slides
+        bannerSlides.forEach(slide => {
+            slide.classList.remove('active');
+        });
+        bannerSlides[index].classList.add('active');
+        
+        // Update dots
+        bannerDots.forEach(dot => {
+            dot.classList.remove('active');
+        });
+        bannerDots[index].classList.add('active');
+        
+        appState.currentBannerIndex = index;
+    };
+    
+    // Next slide function
+    const nextSlide = () => {
+        let nextIndex = appState.currentBannerIndex + 1;
+        if (nextIndex >= bannerSlides.length) {
+            nextIndex = 0;
+        }
+        changeBannerSlide(nextIndex);
+    };
+    
+    // Previous slide function
+    const prevSlide = () => {
+        let prevIndex = appState.currentBannerIndex - 1;
+        if (prevIndex < 0) {
+            prevIndex = bannerSlides.length - 1;
+        }
+        changeBannerSlide(prevIndex);
+    };
+    
+    // Event listeners for buttons
+    prevButton.addEventListener('click', prevSlide);
+    nextButton.addEventListener('click', nextSlide);
+    
+    // Event listeners for dots
+    bannerDots.forEach(dot => {
+        dot.addEventListener('click', function() {
+            const index = parseInt(this.dataset.index);
+            changeBannerSlide(index);
+        });
+    });
+    
+    // Auto slide every 3 seconds
+    appState.bannerInterval = setInterval(nextSlide, 3000);
+    
+    // Pause on hover
+    const bannerSlider = document.getElementById('banner-slider');
+    if (bannerSlider) {
+        bannerSlider.addEventListener('mouseenter', () => {
+            if (appState.bannerInterval) {
+                clearInterval(appState.bannerInterval);
+                appState.bannerInterval = null;
+            }
+        });
+        
+        bannerSlider.addEventListener('mouseleave', () => {
+            if (!appState.bannerInterval) {
+                appState.bannerInterval = setInterval(nextSlide, 3000);
+            }
+        });
     }
 }
 
@@ -369,13 +571,11 @@ function createProductCardElement(product, index) {
     
     // Seller info with verified badge if applicable
     let sellerHtml = '';
-    if (product.seller) {
+    if (product.seller_username) {
         let verifiedBadge = '';
-        if (appState.store.show_verified_icon && 
-            product.seller.show_verified && 
-            product.seller.verified_badge_url) {
+        if (product.seller_verified && appState.web.verified_badge_url) {
             verifiedBadge = `
-                <img src="${escapeHtml(product.seller.verified_badge_url)}" 
+                <img src="${escapeHtml(appState.web.verified_badge_url)}" 
                      alt="Verified" 
                      class="verified-badge" 
                      onerror="this.style.display='none'">
@@ -384,12 +584,12 @@ function createProductCardElement(product, index) {
         
         sellerHtml = `
             <div class="product-seller">
-                <img src="${escapeHtml(product.seller.logo_url || '')}" 
-                     alt="${escapeHtml(product.seller.username)}" 
+                <img src="${escapeHtml(product.seller_logo || '')}" 
+                     alt="${escapeHtml(product.seller_username)}" 
                      class="seller-avatar"
-                     onerror="this.src='data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMzIiIGhlaWdodD0iMzIiIHZpZXdCb3g9IjAgMCAzMiAzMiIgZmlsbD0ibm9uZSIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj48Y2lyY2xlIGN4PSIxNiIgY3k9IjE2IiByPSIxNiIgZmlsbD0iI0ZGQTExOCIvPjx0ZXh0IHg9IjE2IiB5PSIyMSIgZm9udC1mYW1pbHk9IkFyaWFsIiBmb250LXNpemU9IjE0IiBmaWxsPSJ3aGl0ZSIgdGV4dC1hbmNob3I9Im1pZGRsZSI+${btoa(product.seller.username.charAt(0).toUpperCase())}</dGV4dD48L3N2Zz4='">
+                     onerror="this.src='data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMzIiIGhlaWdodD0iMzIiIHZpZXdCb3g9IjAgMCAzMiAzMiIgZmlsbD0ibm9uZSIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj48Y2lyY2xlIGN4PSIxNiIgY3k9IjE2IiByPSIxNiIgZmlsbD0iI0ZGQTExOCIvPjx0ZXh0IHg9IjE2IiB5PSIyMSIgZm9udC1mYW1pbHk9IkFyaWFsIiBmb250LXNpemU9IjE0IiBmaWxsPSJ3aGl0ZSIgdGV4dC1hbmNob3I9Im1pZGRsZSI+${btoa(product.seller_username.charAt(0).toUpperCase())}</dGV4dD48L3N2Zz4='">
                 <div class="seller-info">
-                    <span class="seller-username">${escapeHtml(product.seller.username)}</span>
+                    <span class="seller-username">${escapeHtml(product.seller_username)}</span>
                     ${verifiedBadge}
                 </div>
             </div>
@@ -463,15 +663,16 @@ function renderProductDetailView() {
     const description = getLocalizedText(product.description, appState.currentLanguage);
     const price = formatPrice(product.price);
     
+    // Find seller info
+    const seller = appState.sellers.find(s => s.id === product.seller_id);
+    
     // Seller info with verified badge if applicable
     let sellerHtml = '';
-    if (product.seller) {
+    if (seller) {
         let verifiedBadge = '';
-        if (appState.store.show_verified_icon && 
-            product.seller.show_verified && 
-            product.seller.verified_badge_url) {
+        if (seller.verified && appState.web.verified_badge_url) {
             verifiedBadge = `
-                <img src="${escapeHtml(product.seller.verified_badge_url)}" 
+                <img src="${escapeHtml(appState.web.verified_badge_url)}" 
                      alt="Verified" 
                      class="verified-badge" 
                      onerror="this.style.display='none'">
@@ -480,16 +681,16 @@ function renderProductDetailView() {
         
         sellerHtml = `
             <div class="product-detail-seller">
-                <img src="${escapeHtml(product.seller.logo_url || '')}" 
-                     alt="${escapeHtml(product.seller.username)}" 
+                <img src="${escapeHtml(seller.logo_url || '')}" 
+                     alt="${escapeHtml(seller.username)}" 
                      class="seller-detail-avatar"
-                     onerror="this.src='data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iNDgiIGhlaWdodD0iNDgiIHZpZXdCb3g9IjAgMCA0OCA0OCIgZmlsbD0ibm9uZSIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj48Y2lyY2xlIGN4PSIyNCIgY3k9IjI0IiByPSIyNCIgZmlsbD0iI0ZGQTExOCIvPjx0ZXh0IHg9IjI0IiB5PSIzMiIgZm9udC1mYW1pbHk9IkFyaWFsIiBmb250LXNpemU9IjIwIiBmaWxsPSJ3aGl0ZSIgdGV4dC1hbmNob3I9Im1pZGRsZSI+${btoa(product.seller.username.charAt(0).toUpperCase())}</dGV4dD48L3N2Zz4='">
+                     onerror="this.src='data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iNDgiIGhlaWdodD0iNDgiIHZpZXdCb3g9IjAgMCA0OCA0OCIgZmlsbD0ibm9uZSIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj48Y2lyY2xlIGN4PSIyNCIgY3k9IjI0IiByPSIyNCIgZmlsbD0iI0ZGQTExOCIvPjx0ZXh0IHg9IjI0IiB5PSIzMiIgZm9udC1mYW1pbHk9IkFyaWFsIiBmb250LXNpemU9IjIwIiBmaWxsPSJ3aGl0ZSIgdGV4dC1hbmNob3I9Im1pZGRsZSI+${btoa(seller.username.charAt(0).toUpperCase())}</dGV4dD48L3N2Zz4='">
                 <div class="seller-detail-info">
                     <div class="seller-detail-username">
-                        ${escapeHtml(product.seller.username)}
+                        ${escapeHtml(seller.username)}
                         ${verifiedBadge}
                     </div>
-                    <a href="#/seller/${escapeHtml(product.seller.username)}" class="btn btn-secondary" style="margin-top: 8px; width: fit-content;">
+                    <a href="#/seller/${escapeHtml(seller.id)}" class="btn btn-secondary" style="margin-top: 8px; width: fit-content;">
                         <i class="fas fa-store"></i>
                         <span data-i18n="button.viewSeller">Lihat Toko</span>
                     </a>
@@ -498,21 +699,38 @@ function renderProductDetailView() {
         `;
     }
     
-    // Product images gallery
+    // Seller note if available
+    let sellerNoteHtml = '';
+    if (product.seller_note) {
+        const note = getLocalizedText(product.seller_note, appState.currentLanguage);
+        sellerNoteHtml = `
+            <div class="seller-note">
+                <div class="seller-note-title">
+                    <i class="fas fa-sticky-note"></i>
+                    <span data-i18n="product.sellerNote">Catatan Seller</span>
+                </div>
+                <div class="seller-note-content">${escapeHtml(note)}</div>
+            </div>
+        `;
+    }
+    
+    // Product images gallery (small thumbnails)
     const images = product.images || [product.banner_url || product.icon_url || ''];
     const firstImage = images[0] || '';
     
     let galleryThumbnails = '';
-    images.forEach((img, index) => {
-        galleryThumbnails += `
-            <img src="${escapeHtml(img)}" 
-                 alt="${escapeHtml(title)} - ${index + 1}" 
-                 class="thumbnail ${index === 0 ? 'active' : ''}"
-                 data-index="${index}"
-                 loading="lazy"
-                 onerror="this.onerror=null; this.src='data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iODAiIGhlaWdodD0iODAiIHZpZXdCb3g9IjAgMCA4MCA4MCIgZmlsbD0ibm9uZSIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj48cmVjdCB3aWR0aD0iODAiIGhlaWdodD0iODAiIGZpbGw9IiNGMUY1RjkiLz48cGF0aCBkPSJNNjAgMjBDNjAgMTYuODI0IDU3LjE3NiAxNCA1NCAxNEgyNkMyMi44MjQgMTQgMjAgMTYuODI0IDIwIDIwVjYwQzIwIDYzLjE3NiAyMi44MjQgNjYgMjYgNjZINTNDNTcuMTc2IDY2IDYwIDYzLjE3NiA2MCA2MFYyMFpNNDAgMzJDMzcuNzkwOSAzMiAzNiAzMy43OTA5IDM2IDM2QzM2IDM4LjIwOTEgMzcuNzkwOSA0MCA0MCA0MEM0Mi4yMDkxIDQwIDQ0IDM4LjIwOTEgNDQgMzZDNDQgMzMuNzkwOSA0Mi4yMDkxIDMyIDQwIDMyWiIgZmlsbD0iI0NDREFFMCIgZmlsbC1vcGFjaXR5PSIwLjUiLz48L3N2Zz4=';">
-        `;
-    });
+    if (images.length > 1) {
+        images.forEach((img, index) => {
+            galleryThumbnails += `
+                <img src="${escapeHtml(img)}" 
+                     alt="${escapeHtml(title)} - ${index + 1}" 
+                     class="thumbnail ${index === 0 ? 'active' : ''}"
+                     data-index="${index}"
+                     loading="lazy"
+                     onerror="this.onerror=null; this.src='data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iODAiIGhlaWdodD0iODAiIHZpZXdCb3g9IjAgMCA4MCA4MCIgZmlsbD0ibm9uZSIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj48cmVjdCB3aWR0aD0iODAiIGhlaWdodD0iODAiIGZpbGw9IiNGMUY1RjkiLz48cGF0aCBkPSJNNjAgMjBDNjAgMTYuODI0IDU3LjE3NiAxNCA1NCAxNEgyNkMyMi44MjQgMTQgMjAgMTYuODI0IDIwIDIwVjYwQzIwIDYzLjE3NiAyMi44MjQgNjYgMjYgNjZINTNDNTcuMTc2IDY2IDYwIDYzLjE3NiA2MCA2MFYyMFpNNDAgMzJDMzcuNzkwOSAzMiAzNiAzMy43OTA5IDM2IDM2QzM2IDM4LjIwOTEgMzcuNzkwOSA0MCA0MCA0MEM0Mi4yMDkxIDQwIDQ0IDM4LjIwOTEgNDQgMzZDNDQgMzMuNzkwOSA0Mi4yMDkxIDMyIDQwIDMyWiIgZmlsbD0iI0NDREFFMCIgZmlsbC1vcGFjaXR5PSIwLjUiLz48L3N2Zz4=';">
+            `;
+        });
+    }
     
     container.innerHTML = `
         <div class="product-detail-container">
@@ -522,13 +740,14 @@ function renderProductDetailView() {
                      class="gallery-main-image"
                      id="gallery-main-image"
                      loading="lazy"
-                     onerror="this.onerror=null; this.src='data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iNjAwIiBoZWlnaHQ9IjYwMCIgdmlld0JveD0iMCAwIDYwMCA2MDAiIGZpbGw9Im5vbmUiIHhtbG5zPSJodHRwOi8vd3d3LnczLm9yZy8yMDAwL3N2ZyI+PHJlY3Qgd2lkdGg9IjYwMCIgaGVpZ2h0PSI2MDAiIGZpbGw9IiNGMUY1RjkiLz48cGF0aCBkPSJNMzAwIDE4MEMzNzEuNDYgMTgwIDQyMCAyMjguNTQgNDIwIDMwMEM0MjAgMzcxLjQ2IDM3MS40NiA0MjAgMzAwIDQyMEMyMjguNTQgNDIwIDE4MCAzNzEuNDYgMTgwIDMwMEMxODAgMjI4LjU0IDIyOC41NCAxODAgMzAwIDE4MFpNMzAwIDQyMEM0MjAgNDIwIDQyMCA0NjIuOCA0MjAgNTQwSDE4MEMyODAgNDYyLjggNDIwIDQyMCAzMDAgNDIwWiIgZmlsbD0iI0NDREFFMCIgZmlsbC1vcGFjaXR5PSIwLjUiLz48L3N2Zz4=';">
+                     onerror="this.onerror=null; this.src='data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iNjAwIiBoZWlnaHQ9IjYwMCIgdmlld0JveD0iMCAwIDYwMCA2MDAiIGZpbGw9Im5vbmUiIHhtbG5zPSJodHRwOi8vd3d3LnczLm9yZy8yMDAwL3N2ZyI+PHJlY3Qgd2lkdGg9IjYwMCIgaGVpZ2h0PSI2MDAiIGZpbGw9IiNGMUY1RjkiLz48cGF0aCBkPSJNMzAwIDE4MEMzNzEuNDYgMTgwIDQyMCAyMjguNTQgNDIwIDMwMEM0MjAgMzcxLjQ2IDM3MS40NiA0MjAgMzAwIDQyMEMyMjguNTQgNDIwIDE4MCAzNzEuNDYgMTgwIDMwMEMxODAgMjI4LjU0IDIyOC41NCAxODAgMzAwIDE4MFpNMzAwIDQyMEM0MjAgNDIwIDQyMCA0NjIuOCA0MjAgNTQwSDE4MEwyODAgNDYyLjggNDIwIDQyMCAzMDAgNDIwWiIgZmlsbD0iI0NDREFFMCIgZmlsbC1vcGFjaXR5PSIwLjUiLz48L3N2Zz4=';">
                 ${images.length > 1 ? `<div class="gallery-thumbnails" id="gallery-thumbnails">${galleryThumbnails}</div>` : ''}
             </div>
             <div class="product-detail-info">
                 <h1 class="product-detail-title">${escapeHtml(title)}</h1>
                 <div class="product-detail-price">${escapeHtml(price)}</div>
                 <div class="product-detail-description">${escapeHtml(description)}</div>
+                ${sellerNoteHtml}
                 ${sellerHtml}
                 <div class="product-detail-actions">
                     <button class="btn btn-primary btn-buy" id="buy-button" ${!product.available ? 'disabled' : ''}>
@@ -575,12 +794,10 @@ function renderSellerProfileView() {
     const container = domElements.pageContent;
     if (!container) return;
     
-    // Find seller by username
-    const sellerProducts = appState.products.filter(p => 
-        p.seller && p.seller.username === appState.currentSellerUsername
-    );
+    // Find seller by id
+    const seller = appState.sellers.find(s => s.id === appState.currentSellerId);
     
-    if (sellerProducts.length === 0) {
+    if (!seller) {
         container.innerHTML = `
             <div class="error-message">
                 <div class="error-icon">
@@ -594,15 +811,29 @@ function renderSellerProfileView() {
         return;
     }
     
-    const seller = sellerProducts[0].seller;
+    // Find seller's products
+    const sellerProducts = appState.products.filter(p => p.seller_id === seller.id);
+    
+    // Seller social media links
+    let socialMediaHtml = '';
+    if (seller.social_media && seller.social_media.length > 0) {
+        socialMediaHtml = `<div class="seller-social-media">`;
+        seller.social_media.forEach(social => {
+            socialMediaHtml += `
+                <a href="${escapeHtml(social.url)}" target="_blank" rel="noopener" class="social-media-link">
+                    <img src="${escapeHtml(social.icon_url)}" alt="${escapeHtml(social.name)}" class="social-media-icon" onerror="this.style.display='none'">
+                    <span>${escapeHtml(social.name)}</span>
+                </a>
+            `;
+        });
+        socialMediaHtml += `</div>`;
+    }
     
     // Check if seller has verified badge
     let verifiedBadge = '';
-    if (appState.store.show_verified_icon && 
-        seller.show_verified && 
-        seller.verified_badge_url) {
+    if (seller.verified && appState.web.verified_badge_url) {
         verifiedBadge = `
-            <img src="${escapeHtml(seller.verified_badge_url)}" 
+            <img src="${escapeHtml(appState.web.verified_badge_url)}" 
                  alt="Verified" 
                  class="verified-badge" 
                  style="width: 24px; height: 24px;"
@@ -622,9 +853,11 @@ function renderSellerProfileView() {
                         ${escapeHtml(seller.username)}
                         ${verifiedBadge}
                     </h1>
+                    <p class="seller-profile-description">${escapeHtml(seller.description || '')}</p>
                     <p class="seller-products-count">
                         ${sellerProducts.length} <span data-i18n="seller.productsCount">produk tersedia</span>
                     </p>
+                    ${socialMediaHtml}
                 </div>
             </div>
             <h2 class="seller-products-title" data-i18n="seller.products">Produk dari Penjual</h2>
@@ -635,11 +868,23 @@ function renderSellerProfileView() {
     // Render seller's products
     const sellerProductsGrid = container.querySelector('#seller-products-grid');
     if (sellerProductsGrid) {
-        sellerProducts.forEach((product, index) => {
-            setTimeout(() => {
-                sellerProductsGrid.appendChild(createProductCardElement(product, index));
-            }, index * 50);
-        });
+        if (sellerProducts.length === 0) {
+            sellerProductsGrid.innerHTML = `
+                <div class="no-products" style="grid-column: 1 / -1;">
+                    <div class="no-products-icon">
+                        <i class="fas fa-box-open"></i>
+                    </div>
+                    <h3 class="no-products-title" data-i18n="seller.noProducts">Belum ada produk</h3>
+                    <p class="no-products-text" data-i18n="seller.noProductsText">Penjual ini belum menambahkan produk.</p>
+                </div>
+            `;
+        } else {
+            sellerProducts.forEach((product, index) => {
+                setTimeout(() => {
+                    sellerProductsGrid.appendChild(createProductCardElement(product, index));
+                }, index * 50);
+            });
+        }
     }
 }
 
@@ -686,11 +931,11 @@ function renderAboutView() {
     } else {
         container.innerHTML = `
             <div class="about-container">
-                <h1 class="page-title" data-i18n="about.title">Tentang ${escapeHtml(appState.store.name)}</h1>
+                <h1 class="page-title" data-i18n="about.title">Tentang ${escapeHtml(appState.web.store_name)}</h1>
                 <div class="about-section">
                     <h2 class="about-title" data-i18n="about.welcome">Selamat Datang</h2>
                     <p class="about-text" data-i18n="about.welcomeText">
-                        ${escapeHtml(appState.store.name)} adalah marketplace sederhana yang menyediakan berbagai produk digital seperti top up game, skin eksklusif, dan produk digital lainnya.
+                        ${escapeHtml(appState.web.store_name)} adalah marketplace sederhana yang menyediakan berbagai produk digital seperti top up game, skin eksklusif, dan produk digital lainnya.
                     </p>
                 </div>
                 <div class="about-section">
@@ -706,7 +951,7 @@ function renderAboutView() {
                 <div class="about-section">
                     <h2 class="about-title" data-i18n="about.contactUs">Hubungi Kami</h2>
                     <p class="about-text" data-i18n="about.contactUsText">
-                        WhatsApp: ${appState.store.wa_number}<br>
+                        WhatsApp: ${appState.web.wa_number}<br>
                         Email: support@ditzxstore.com
                     </p>
                 </div>
@@ -794,7 +1039,8 @@ function getUIText(key, lang) {
             'nav.about': 'Tentang',
             'nav.privacy': 'Privasi',
             'search.placeholder': 'Cari produk...',
-            'home.title': 'Produk Terbaru',
+            'home.categories': 'Kategori Produk',
+            'home.products': 'Produk Terbaru',
             'home.noProductsTitle': 'Produk tidak ditemukan',
             'home.noProductsText': 'Coba gunakan kata kunci lain atau pilih kategori berbeda.',
             'filter.all': 'Semua',
@@ -807,10 +1053,13 @@ function getUIText(key, lang) {
             'button.retry': 'Coba Lagi',
             'product.notFound': 'Produk tidak ditemukan',
             'product.notFoundText': 'Produk yang Anda cari tidak tersedia atau telah dihapus.',
+            'product.sellerNote': 'Catatan Seller',
             'seller.notFound': 'Penjual tidak ditemukan',
             'seller.notFoundText': 'Penjual yang Anda cari tidak tersedia atau telah menghapus toko.',
             'seller.productsCount': 'produk tersedia',
             'seller.products': 'Produk dari Penjual',
+            'seller.noProducts': 'Belum ada produk',
+            'seller.noProductsText': 'Penjual ini belum menambahkan produk.',
             'about.title': 'Tentang DitzXstore',
             'about.welcome': 'Selamat Datang',
             'about.welcomeText': 'DitzXstore adalah marketplace sederhana yang menyediakan berbagai produk digital seperti top up game, skin eksklusif, dan produk digital lainnya.',
@@ -842,7 +1091,8 @@ function getUIText(key, lang) {
             'nav.about': 'About',
             'nav.privacy': 'Privacy',
             'search.placeholder': 'Search products...',
-            'home.title': 'Latest Products',
+            'home.categories': 'Product Categories',
+            'home.products': 'Latest Products',
             'home.noProductsTitle': 'No products found',
             'home.noProductsText': 'Try different keywords or select another category.',
             'filter.all': 'All',
@@ -855,10 +1105,13 @@ function getUIText(key, lang) {
             'button.retry': 'Try Again',
             'product.notFound': 'Product not found',
             'product.notFoundText': 'The product you are looking for is not available or has been removed.',
+            'product.sellerNote': 'Seller Note',
             'seller.notFound': 'Seller not found',
             'seller.notFoundText': 'The seller you are looking for is not available or has removed their store.',
             'seller.productsCount': 'products available',
             'seller.products': 'Products from Seller',
+            'seller.noProducts': 'No products yet',
+            'seller.noProductsText': 'This seller has not added any products yet.',
             'about.title': 'About DitzXstore',
             'about.welcome': 'Welcome',
             'about.welcomeText': 'DitzXstore is a simple marketplace that provides various digital products such as game top ups, exclusive skins, and other digital products.',
@@ -896,7 +1149,7 @@ function getLocalizedText(textObj, lang) {
     
     if (typeof textObj === 'string') return textObj;
     
-    return textObj[lang] || textObj[appState.store.default_language] || 
+    return textObj[lang] || textObj[appState.web.default_language] || 
            textObj['id'] || textObj['en'] || 
            Object.values(textObj)[0] || '';
 }
@@ -917,15 +1170,17 @@ function formatPrice(price) {
 
 // Open WhatsApp with product info
 function openWhatsApp(product) {
-    if (!appState.store || !appState.store.wa_number) {
+    if (!appState.web || !appState.web.wa_number) {
         alert('WhatsApp number is not configured.');
         return;
     }
     
-    const template = product.whatsapp_message_template || appState.store.wa_message_default;
+    // Use seller's WA number if available, otherwise use store's WA number
+    const waNumber = product.seller_wa_number || appState.web.wa_number;
+    const template = product.whatsapp_message_template || appState.web.wa_message_default;
     const title = getLocalizedText(product.title, appState.currentLanguage);
     const price = formatPrice(product.price);
-    const seller = product.seller?.username || '';
+    const seller = product.seller_username || '';
     
     // Replace placeholders in template
     let message = template
@@ -936,7 +1191,7 @@ function openWhatsApp(product) {
     
     // Encode message for URL
     const encodedMessage = encodeURIComponent(message);
-    const url = `https://wa.me/${appState.store.wa_number}?text=${encodedMessage}`;
+    const url = `https://wa.me/${waNumber}?text=${encodedMessage}`;
     
     window.open(url, '_blank');
 }
@@ -953,11 +1208,6 @@ function hideWhatsAppCTA() {
     if (domElements.whatsappCta) {
         domElements.whatsappCta.style.display = 'none';
     }
-}
-
-// Render individual product card (for animation)
-function renderProductCard(product, index) {
-    // This is handled by createProductCardElement
 }
 
 // Escape HTML to prevent XSS
