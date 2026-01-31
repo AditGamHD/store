@@ -1,0 +1,22 @@
+{
+  "store_name": "DitzXstore",
+  "logo_url": "https://blogger.googleusercontent.com/img/a/AVvXsEgG8BfVottdnZxviuOApnvnWjjMo4IMZW4JeTT3BExor7GZmhm_a7ZY8iqDmvBdM1cKZ1eghcw5OUfsJL2voavIuV0UeemI-fQ5AmS3JRtQlZrEqBSFCypvdUoorN9FIncxHc7OLaqcZ8j4gAaK_qFVSFz4JS40JBLCK1e2ri--b26df3GMMGhP_pgMMhpQ",
+  "theme_color": "#ff7a18",
+  "wa_number": "6285648211278",
+  "wa_message_default": "Halo, saya mau beli produk dari DitzXstore",
+  "languages": ["id", "en"],
+  "default_language": "id",
+  "verified_badge_url": "https://cdn-icons-png.flaticon.com/512/8457/8457457.png",
+  "copyright": "© 2025–sekarang ADITdeveloper",
+  "banners": [
+    "https://images.unsplash.com/photo-1607082350899-7e105aa886ae?ixlib=rb-4.0.3&auto=format&fit=crop&w=1600&q=80",
+    "https://images.unsplash.com/photo-1556742049-0cfed4f6a45d?ixlib=rb-4.0.3&auto=format&fit=crop&w=1600&q=80",
+    "https://images.unsplash.com/photo-1556742044-3c52d6e88c62?ixlib=rb-4.0.3&auto=format&fit=crop&w=1600&q=80",
+    "https://images.unsplash.com/photo-1556740772-1a741367b93e?ixlib=rb-4.0.3&auto=format&fit=crop&w=1600&q=80",
+    "https://images.unsplash.com/photo-1556742049-0cfed4f6a45d?ixlib=rb-4.0.3&auto=format&fit=crop&w=1600&q=80"
+  ],
+  "running_text": {
+    "id": "🎉 Selamat datang di DitzXstore! Diskon 10% untuk pembelian pertama. 🎁 Gratis voucher untuk setiap pembelian di atas Rp 100.000!",
+    "en": "🎉 Welcome to DitzXstore! 10% discount for first purchase. 🎁 Free voucher for every purchase above Rp 100,000!"
+  }
+}
