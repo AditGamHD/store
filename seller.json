@@ -1,36 +1,31 @@
 [
   {
-    "id": "seller-001",
-    "username": "adit_store",
-    "logo_url": "https://cdn-icons-png.flaticon.com/512/3135/3135715.png",
+    "id": "UVOSHOP",
+    "username": "uvoshop",
+    "logo_url": "https://blogger.googleusercontent.com/img/b/R29vZ2xl/AVvXsEgjKEMTtlZx6I5bQnMTw9AtOmAYikiiIloZ5h8Mr0e47WicdI2rp0gQojMGbYkBICw7poPd8lQESYKj6nb72nUJdABsEKsKBM1GVhU_ZDex-qbmbWpOyEzPVnoknQ8NWK0tdK5eMpPkh4QZnc8rWqn6kV5if3l2uxa79fjJFp41d9t3TbyTjryk8AIw3tFs/s320/WhatsApp%20Image%202025-04-28%20at%2009.28.49_45c5cb4f.jpg",
     "verified": true,
     "description": "Seller terpercaya dengan rating 5.0. Spesialis produk game dan voucher digital.",
-    "wa_number": "6281234567890",
+    "wa_number": "6285648211278",
     "note": {
-      "id": "Produk ready stock, proses 5-15 menit setelah pembayaran. Garansi 30 hari untuk semua produk.",
-      "en": "Products ready stock, process 5-15 minutes after payment. 30 days warranty for all products."
+      "id": "Produk ready stock, proses 5-15 menit setelah pembayaran.",
+      "en": "Products ready stock, process 5-15 minutes after payment."
     },
     "social_media": [
       {
-        "name": "Instagram",
-        "icon_url": "https://cdn-icons-png.flaticon.com/512/2111/2111463.png",
-        "url": "https://instagram.com/adit_store"
-      },
-      {
-        "name": "Facebook",
-        "icon_url": "https://cdn-icons-png.flaticon.com/512/733/733547.png",
-        "url": "https://facebook.com/adit_store"
+        "name": "Website",
+        "icon_url": "https://blogger.googleusercontent.com/img/b/R29vZ2xl/AVvXsEjUtICjAMwukAPrO40Ti_R3NAN7GEPJfZr8HSvrJaAvDOARYOr8pHyyCSS6bn7Wr27UvPi6WJzA1CpMbXJfNC-ITtuN5LwGGkp3Je_9cCptqfhBxfMoPT5YLkeXy2YAfHRiX8KzttqDGeXKykz8tVMc1aiWpP79XjgbKB45e1PDZiCFkbnf1H1av7SZ-eku/s320/logo%20uvoshop%20transparan.png",
+        "url": "https://uvoshop.my.id"
       }
     ],
     "products": [
       {
-        "id": "prd-001",
+        "id": "secret1",
         "title": {
-          "id": "Top Up Diamond Mobile Legends",
-          "en": "Mobile Legends Diamond Top Up"
+          "id": "Secret Tumbal",
+          "en": "Secret Tumbal"
         },
         "price": {
-          "amount": 28000,
+          "amount": 2000,
           "currency": "IDR"
         },
         "available": true,
@@ -41,21 +36,21 @@
           "https://cdn-icons-png.flaticon.com/512/1384/1384060.png"
         ],
         "description": {
-          "id": "Top up diamond untuk game Mobile Legends, proses manual via WA. Setelah transfer screenshot dan tunggu konfirmasi. Proses 5-15 menit setelah pembayaran.",
-          "en": "Diamond top up for Mobile Legends game, manual process via WhatsApp. After payment send screenshot and wait for confirmation. Process takes 5-15 minutes after payment."
+          "id": "Ready Secret Tumbal 5k",
+          "en": "Ready Secret Tumbal 5k"
         },
-        "category": "Top Up",
-        "tags": ["diamond", "mobile legends", "game"],
+        "category": "Fish It",
+        "tags": ["fish", "ikan", "secret"],
         "whatsapp_message_template": "Halo, saya ingin membeli {title} (ID: {id}) seharga {price} dari penjual {seller}. Apakah masih tersedia?"
       },
       {
-        "id": "prd-003",
+        "id": "secret2",
         "title": {
-          "id": "Voucher Google Play 100k",
-          "en": "Google Play Voucher 100k"
+          "id": "Secret fish it",
+          "en": "Secret fish it"
         },
         "price": {
-          "amount": 105000,
+          "amount": 5000,
           "currency": "IDR"
         },
         "available": true,
@@ -66,11 +61,11 @@
           "https://cdn-icons-png.flaticon.com/512/732/732084.png"
         ],
         "description": {
-          "id": "Voucher Google Play senilai 100.000 IDR, bisa untuk pembelian game, aplikasi, atau konten digital lainnya di Google Play Store.",
-          "en": "Google Play voucher worth 100,000 IDR, can be used to purchase games, apps, or other digital content on Google Play Store."
+          "id": "Ready secret King Jely,Crososaurus dan El maja",
+          "en": "Ready secret King Jely,Crososaurus dan El maja"
         },
-        "category": "Voucher",
-        "tags": ["voucher", "google play", "digital"]
+        "category": "Secret",
+        "tags": ["secret", "fishit", "game"]
       }
     ]
   },
