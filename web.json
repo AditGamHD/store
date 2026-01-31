@@ -6,7 +6,7 @@
   "wa_message_default": "Halo, saya mau beli produk dari DitzXstore",
   "languages": ["id", "en"],
   "default_language": "id",
-  "verified_badge_url": "https://cdn-icons-png.flaticon.com/512/8457/8457457.png",
+  "verified_badge_url": "https://github.com/AditGamHD/ditzx/blob/main/check.png?raw=true",
   "copyright": "© 2025 ADITdeveloper",
   "banners": [
     "https://images.unsplash.com/photo-1607082350899-7e105aa886ae?ixlib=rb-4.0.3&auto=format&fit=crop&w=1600&q=80",
@@ -16,7 +16,7 @@
     "https://images.unsplash.com/photo-1556742049-0cfed4f6a45d?ixlib=rb-4.0.3&auto=format&fit=crop&w=1600&q=80"
   ],
   "running_text": {
-    "id": "🎉 Selamat datang di DitzXstore! Diskon 10% untuk pembelian pertama. 🎁 Gratis voucher untuk setiap pembelian di atas Rp 100.000!",
-    "en": "🎉 Welcome to DitzXstore! 10% discount for first purchase. 🎁 Free voucher for every purchase above Rp 100,000!"
+    "id": "🎉 Selamat datang di DitzXstore! Platfom pembelian produk digital",
+    "en": "🎉 Welcome to DitzXstore! Digital product purchasing platform"
   }
 }
