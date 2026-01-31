@@ -1,14 +1,14 @@
 {
   "store": {
     "name": "DitzXstore",
-    "logo_url": "https://cdn-icons-png.flaticon.com/512/891/891419.png",
+    "logo_url": "https://blogger.googleusercontent.com/img/a/AVvXsEgG8BfVottdnZxviuOApnvnWjjMo4IMZW4JeTT3BExor7GZmhm_a7ZY8iqDmvBdM1cKZ1eghcw5OUfsJL2voavIuV0UeemI-fQ5AmS3JRtQlZrEqBSFCypvdUoorN9FIncxHc7OLaqcZ8j4gAaK_qFVSFz4JS40JBLCK1e2ri--b26df3GMMGhP_pgMMhpQ",
     "theme_color": "#ff7a18",
     "wa_number": "6281234567890",
     "wa_message_default": "Halo, saya mau beli produk dari DitzXstore",
     "languages": ["id", "en"],
     "default_language": "id",
     "show_verified_icon": true,
-    "copyright": "© 2025–sekarang ADITdeveloper"
+    "copyright": "© 2025 ADITdeveloper"
   },
   "products": [
     {
